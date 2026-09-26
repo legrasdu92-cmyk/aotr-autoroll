@@ -1,0 +1,86 @@
+=====================================================================
+   AUTO-ROLL DES FAMILLES AOTR  -  MODE D'EMPLOI
+=====================================================================
+
+Rien à installer : le programme utilise uniquement des outils déjà
+présents dans Windows (PowerShell + la lecture de texte intégrée).
+
+
+---------------------------------------------------------------------
+INSTALLATION (une seule fois)
+---------------------------------------------------------------------
+  1. Clic droit sur le zip  >  Propriétés  >  coche « Débloquer »  >  OK
+     (si la case n'existe pas, c'est déjà bon).
+  2. Clic droit sur le zip  >  « Extraire tout... »  >  le Bureau.
+
+Ensuite, plus besoin de revenir : le programme se MET À JOUR TOUT SEUL
+à chaque lancement (il vérifie sur GitHub s'il y a une nouvelle version).
+Tes réglages (config.json) et ton historique (tirages.csv, historique.txt)
+ne sont jamais touchés par une mise à jour.
+
+
+---------------------------------------------------------------------
+UTILISATION
+---------------------------------------------------------------------
+  1. Lance Roblox, rejoins Attack on Titan Revolution, va sur l'écran
+     des FAMILLES (bouton rond « F » à gauche, bouton ROLL en bas à
+     droite). Plein écran conseillé. Roblox peut être derrière d'autres
+     fenêtres mais JAMAIS réduit.
+  2. Double-clic sur  « Auto-roll AOTR.vbs ».
+       - « Windows a protégé votre ordinateur » : « Informations
+         complémentaires » > « Exécuter quand même ».
+       - Si le .vbs est bloqué : « Lancer si le vbs est bloque.bat ».
+  3. Coche les familles à GARDER (le roll s'arrête dessus).
+  4. « Tester la lecture » : le journal doit afficher ta famille,
+     le bouton ROLL et tes spins restants.
+  5. « ▶ Lancer ».  Arrêt : bouton « ■ Arrêter » ou touche F8.
+
+Pendant le roll :
+  - ne réduis pas Roblox, ne verrouille pas le PC (Win+L) et empêche
+    la mise en veille (Paramètres > Système > Alimentation > Jamais) ;
+  - sur un autre PC, ne lance pas un autre jeu Roblox avec le MÊME
+    compte (Roblox déconnecterait l'un des deux).
+
+
+---------------------------------------------------------------------
+SUIVRE LE ROLL DEPUIS UN AUTRE APPAREIL (PC principal, téléphone)
+---------------------------------------------------------------------
+La ligne « Suivi : » de la fenêtre donne TON adresse personnelle
+(https://aotr-suivi.onrender.com/?c=...), bouton « Copier » à côté.
+Ouvre-la n'importe où (PC, téléphone, même en 4G) :
+  - onglet « En direct » : statut, spins faits / restants, famille
+    actuelle, tirages de la session, derniers spins ;
+  - onglet « Historique » : tous les tirages de toutes les sessions
+    (filtres), tes plus belles familles (Épique et +) avec la date,
+    les sessions, les totaux par rareté ;
+  - « 🔔 Activer le son d'alerte » : la page sonne et clignote quand
+    une famille gardée sort.
+
+Économie des heures Render : le programme n'envoie RIEN tant que
+personne n'a la page ouverte. Quand tu l'ouvres, les données arrivent
+en quelques secondes (jusqu'à ~1 min si le site dormait).
+Garde ton adresse pour toi : le code à la fin est ta clé.
+
+
+---------------------------------------------------------------------
+EN CAS DE PROBLÈME
+---------------------------------------------------------------------
+  « Roblox introuvable »     -> Roblox n'est pas lancé ou est réduit.
+  « En pause »               -> Roblox est réduit : remets-le en fenêtre.
+  « Impossible de lire... »  -> tu n'es pas sur l'écran des familles.
+  « famille inconnue lue »   -> nouvelle famille : ajoute son nom dans
+                                familles.psd1 (dans la bonne rareté).
+  Rien ne se passe au clic   -> essaie « Clics : Premier plan » et
+                                laisse Roblox devant.
+Le titre de la fenêtre affiche le numéro de version.
+
+
+---------------------------------------------------------------------
+SÉCURITÉS INTÉGRÉES
+---------------------------------------------------------------------
+  - Il ne clique sur ROLL que s'il a LU ta famille actuelle et qu'elle
+    n'est pas à garder.
+  - Il répond YES à « Are you sure you want to reroll...? » uniquement
+    si la famille en jeu n'est pas à garder.
+  - Un spin n'est compté que si le compteur du bouton ROLL a baissé.
+  - Il s'arrête au nombre max de spins choisi.

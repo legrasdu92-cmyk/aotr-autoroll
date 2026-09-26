@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suivi auto-roll AOTR</title>
+<style>
+  :root {
+    --fond: #161412; --carte: #221f1c; --carte2: #2a2622; --bord: #3a342c; --texte: #ebe6dc; --gris: #968f86;
+    --or: #deb86e; --ok: #78e678; --alerte: #f0aa5a;
+    --commune: #b9b9b9; --rare: #78beff; --epique: #be8cff; --legendaire: #f5c85a; --mythique: #ff5a5a;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --fond: #f4f1ec; --carte: #ffffff; --carte2: #f7f3ec; --bord: #ddd5c8; --texte: #1f1b16; --gris: #6f675d; --or: #9a6f1c;
+            --ok: #1f8a3a; --alerte: #b8620f; --commune: #6b6b6b; --rare: #1f6fbf; --epique: #7a3fd1; --legendaire: #a87400; --mythique: #c42020; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fond); color: var(--texte); font: 15px/1.45 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { font: 600 24px Georgia, serif; color: var(--or); margin: 0 0 2px; }
+  h2 { font-size: 13px; color: var(--gris); font-weight: 600; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .05em; }
+  .sous { color: var(--gris); font-size: 13px; }
+  .entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .pilule { display: inline-block; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--bord); font-size: 13px; font-weight: 600; }
+  .onglets { display: flex; gap: 6px; margin-bottom: 14px; border-bottom: 1px solid var(--bord); }
+  .onglets button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--gris); padding: 8px 12px; font: 600 14px inherit; font-family: inherit; cursor: pointer; }
+  .onglets button.actif { color: var(--or); border-bottom-color: var(--or); }
+  .carte { background: var(--carte); border: 1px solid var(--bord); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+  .chiffres { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .chiffre b { display: block; font-size: 28px; font-variant-numeric: tabular-nums; }
+  .chiffre span { color: var(--gris); font-size: 13px; }
+  .famille { font-size: 22px; font-weight: 600; }
+  .barre { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 14px; }
+  .barre .nom { width: 92px; } .barre .val { width: 90px; text-align: right; font-variant-numeric: tabular-nums; }
+  .barre .fond { flex: 1; height: 10px; background: var(--bord); border-radius: 5px; overflow: hidden; }
+  .barre .plein { height: 100%; border-radius: 5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; color: var(--gris); font-weight: 600; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--bord); }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--bord); font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: 0; }
+  .num { text-align: right; }
+  .puces { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .puce { background: var(--carte2); color: var(--texte); border: 1px solid var(--bord); border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 13px; cursor: pointer; }
+  .puce.actif { border-color: var(--or); color: var(--or); }
+  select, input { background: var(--carte2); color: var(--texte); border: 1px solid var(--bord); border-radius: 8px; padding: 6px 9px; font: inherit; font-size: 13px; }
+  .outils { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  button.plus { background: var(--carte2); color: var(--texte); border: 1px solid var(--or); border-radius: 8px; padding: 7px 12px; font: inherit; cursor: pointer; margin-top: 10px; }
+  #victoire { display: none; text-align: center; border: 2px solid var(--ok); }
+  #victoire b { font-size: 26px; color: var(--ok); display: block; }
+  #horsligne { display: none; border-color: var(--alerte); color: var(--alerte); }
+  .vide { color: var(--gris); font-size: 14px; }
+  .defile { overflow-x: auto; }
+  [hidden] { display: none !important; }
+  .jours { display: flex; align-items: flex-end; gap: 4px; height: 140px; padding-top: 18px; }
+  .jour { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; }
+  .jour .b { width: 100%; max-width: 34px; background: var(--or); border-radius: 4px 4px 0 0; min-height: 2px; }
+  .jour .v { font-size: 11px; color: var(--gris); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+  .jour .d { font-size: 11px; color: var(--gris); margin-top: 4px; white-space: nowrap; }
+  .jour:hover .b { opacity: .8; }
+  @media (max-width: 560px) { .jour:nth-child(2n) .d { visibility: hidden; } .jour .v { font-size: 10px; } }
+  .jauge { height: 12px; background: var(--bord); border-radius: 6px; overflow: hidden; margin: 8px 0 4px; }
+  .jauge div { height: 100%; background: var(--or); border-radius: 6px; }
+  .grand { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .groupe { font-size: 12px; font-weight: 600; margin: 12px 0 2px; text-transform: uppercase; letter-spacing: .04em; }
+</style>
+</head>
+<body>
+<main>
+  <div class="entete">
+    <div>
+      <h1>Auto-roll AOTR</h1>
+      <div class="sous" id="machine">Suivi depuis l'autre PC</div>
+    </div>
+    <span class="pilule" id="statut">…</span>
+  </div>
+
+  <div class="carte" id="horsligne">L'autre PC ne répond plus (fenêtre de l'auto-roll fermée, PC en veille ou réseau coupé). Nouvel essai automatique…</div>
+  <div class="carte" id="attente" style="display:none;color:var(--gris)">Connexion à l'autre PC… Il commence à envoyer ses données dès que cette page est ouverte (en général moins de 15 s). La fenêtre de l'auto-roll doit être ouverte sur l'autre PC.</div>
+  <div class="carte" id="victoire"><b>Famille obtenue !</b><span id="victoireTexte"></span></div>
+
+  <div class="onglets">
+    <button class="actif" data-onglet="direct">En direct</button>
+    <button data-onglet="historique">Historique</button>
+    <button data-onglet="stats">Stats</button>
+  </div>
+
+  <!-- ===== En direct ===== -->
+  <section id="direct">
+    <div class="carte">
+      <div class="chiffres">
+        <div class="chiffre"><b id="faits">0</b><span>spins cette session</span></div>
+        <div class="chiffre"><b id="restants">?</b><span>spins restants</span></div>
+        <div class="chiffre"><b id="vitesse">–</b><span>par spin</span></div>
+      </div>
+    </div>
+    <div class="carte">
+      <h2>Famille actuelle</h2>
+      <div class="famille" id="famille">–</div>
+      <div class="sous" id="gardees" style="margin-top:6px"></div>
+    </div>
+    <div class="carte"><h2>Tirages de la session</h2><div id="statsSession"><span class="vide">Aucun spin pour l'instant.</span></div></div>
+    <div class="carte"><h2>Derniers spins</h2><div class="defile"><table><thead><tr><th>Heure</th><th>Famille</th><th>Rareté</th></tr></thead><tbody id="derniers"></tbody></table></div></div>
+  </section>
+
+  <!-- ===== Historique ===== -->
+  <section id="historique" hidden>
+    <div class="carte">
+      <div class="chiffres">
+        <div class="chiffre"><b id="hTotal">0</b><span>spins au total</span></div>
+        <div class="chiffre"><b id="hSessions">0</b><span>sessions</span></div>
+        <div class="chiffre"><b id="hEpiquePlus">0</b><span>épiques ou mieux</span></div>
+      </div>
+    </div>
+    <div class="carte"><h2>Toutes les familles obtenues, par rareté</h2><div id="hStats"></div></div>
+    <div class="carte">
+      <h2>Tes plus belles familles (Épique et plus)</h2>
+      <div class="defile"><table><thead><tr><th>Date</th><th>Heure</th><th>Famille</th><th>Rareté</th><th class="num">Spin n°</th></tr></thead><tbody id="hBelles"></tbody></table></div>
+    </div>
+    <div class="carte">
+      <h2>Sessions</h2>
+      <div class="defile"><table><thead><tr><th>Début</th><th class="num">Spins</th><th>Meilleure famille</th><th>Fin</th></tr></thead><tbody id="hSessionsListe"></tbody></table></div>
+    </div>
+    <div class="carte">
+      <h2>Tous les tirages</h2>
+      <div class="puces" id="filtresRarete"></div>
+      <div class="outils">
+        <select id="filtreSession"><option value="">Toutes les sessions</option></select>
+        <input id="filtreNom" placeholder="Chercher une famille…" size="18">
+        <span class="sous" id="compteFiltre"></span>
+      </div>
+      <div class="defile"><table><thead><tr><th>Date</th><th>Heure</th><th>Famille</th><th>Rareté</th><th class="num">Spin n°</th><th class="num">Restants</th></tr></thead><tbody id="hTable"></tbody></table></div>
+      <button class="plus" id="plus" hidden>Afficher plus</button>
+    </div>
+  </section>
+
+  <!-- ===== Stats ===== -->
+  <section id="stats" hidden>
+    <div class="carte">
+      <div class="chiffres">
+        <div class="chiffre"><b id="sAujourdhui">0</b><span>spins aujourd'hui</span></div>
+        <div class="chiffre"><b id="sTemps">–</b><span>temps de roll (estimé)</span></div>
+        <div class="chiffre"><b id="sChance">–</b><span>Épiques+ obtenues / attendues</span></div>
+      </div>
+    </div>
+    <div class="carte">
+      <h2>Ta chance comparée aux taux du jeu</h2>
+      <div class="defile"><table><thead><tr><th>Rareté</th><th class="num">Obtenues</th><th class="num">Attendues</th><th class="num">Ton taux</th><th class="num">Taux du jeu</th></tr></thead><tbody id="sTaux"></tbody></table></div>
+      <div class="sous" style="margin-top:8px">Taux du jeu = ceux affichés dans AOTR (événement « x2 famille »). Sur peu de spins, l'écart est normal.</div>
+    </div>
+    <div class="carte">
+      <h2>Pity (Épique ou mieux garantie à 400)</h2>
+      <div class="grand" id="sPity">–</div>
+      <div class="jauge"><div id="sPityJauge" style="width:0"></div></div>
+      <div class="sous" id="sPityTexte"></div>
+    </div>
+    <div class="carte">
+      <h2>Probabilités</h2>
+      <div class="defile"><table><tbody id="sProba"></tbody></table></div>
+    </div>
+    <div class="carte"><h2>Spins par jour (14 derniers jours)</h2><div class="jours" id="sJours"></div></div>
+    <div class="carte"><h2>Chaque famille obtenue</h2><div id="sFamilles"></div></div>
+  </section>
+
+  <div class="entete" style="margin-top:6px">
+    <span class="sous" id="maj"></span>
+    <button class="puce" id="son">🔔 Activer le son d'alerte</button>
+  </div>
+</main>
+<script>
+const FR = { Common: 'Commune', Rare: 'Rare', Epic: 'Épique', Legendary: 'Légendaire', Mythic: 'Mythique', Mythical: 'Mythique', Secret: 'Secrète' };
+const COUL = { Commune: 'var(--commune)', Rare: 'var(--rare)', 'Épique': 'var(--epique)', 'Légendaire': 'var(--legendaire)', Mythique: 'var(--mythique)', 'Secrète': 'var(--mythique)' };
+const ORDRE = ['Mythique', 'Légendaire', 'Épique', 'Rare', 'Commune'];
+const RANG = { 'Commune': 0, 'Rare': 1, 'Épique': 2, 'Légendaire': 3, 'Mythique': 4, 'Secrète': 5 };
+const $ = id => document.getElementById(id);
+/* En ligne (relais Render) : code secret dans l'adresse (?c=...). En local (reseau de la maison) : pas de code. */
+const CODE = new URLSearchParams(location.search).get('c');
+const Q = CODE ? '?c=' + encodeURIComponent(CODE) : '';
+if (CODE) {
+  // Signal « quelqu'un regarde » : l'auto-roll n'envoie ses donnees que pendant ce temps (economise les heures Render)
+  const signal = () => fetch('https://ntfy.sh/aotr-' + CODE, { method: 'POST', body: 'vu' }).catch(() => {});
+  signal(); setInterval(signal, 60000);
+}
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const dateFr = d => d ? d.split('-').reverse().join('/') : '';
+const coul = r => COUL[r] || 'var(--texte)';
+
+/* ---------- onglets ---------- */
+document.querySelectorAll('.onglets button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.onglets button').forEach(x => x.classList.toggle('actif', x === b));
+  ['direct', 'historique', 'stats'].forEach(id => $(id).hidden = b.dataset.onglet !== id);
+  try { localStorage.setItem('onglet', b.dataset.onglet); } catch (e) {}
+  if (b.dataset.onglet !== 'direct') chargerHistorique();
+});
+try { const o = localStorage.getItem('onglet'); if (o) document.querySelector(`[data-onglet="${o}"]`)?.click(); } catch (e) {}
+
+/* ---------- son et alerte dans la page ---------- */
+let sonActif = false, ctx = null, clignote = null, dejaAlerte = false;
+$('son').onclick = () => { try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume(); sonActif = true; bip(); $('son').textContent = '🔔 Son activé'; } catch (e) {} };
+function bip() {
+  if (!ctx) return;
+  [0, .25, .5].forEach((t, i) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = [880, 1175, 1568][i]; g.gain.value = .15; o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + .2); });
+}
+function alerte() {
+  if (sonActif) { bip(); setTimeout(bip, 900); }
+  let n = 0; clearInterval(clignote);
+  clignote = setInterval(() => { document.title = (n++ % 2) ? '✅ FAMILLE OBTENUE' : 'Suivi auto-roll AOTR'; }, 800);
+  window.addEventListener('focus', () => { clearInterval(clignote); document.title = 'Suivi auto-roll AOTR'; }, { once: true });
+}
+
+function barres(stats) {
+  const total = ORDRE.reduce((s, k) => s + (stats[k] || 0), 0);
+  if (!total) return '<span class="vide">Aucun spin pour l\'instant.</span>';
+  return ORDRE.filter(k => stats[k]).map(k =>
+    `<div class="barre"><span class="nom" style="color:${coul(k)}">${k}</span><div class="fond"><div class="plein" style="width:${Math.max(1.5, 100 * stats[k] / total)}%;background:${coul(k)}"></div></div><span class="val">${stats[k]} <span class="sous">(${(100 * stats[k] / total).toFixed(1)} %)</span></span></div>`).join('');
+}
+
+/* ---------- en direct ---------- */
+async function majDirect() {
+  try {
+    const e = await (await fetch('/etat' + Q, { cache: 'no-store' })).json();
+    $('horsligne').style.display = 'none';
+    $('attente').style.display = e._vide ? 'block' : 'none';
+    if (e._vide) { $('statut').textContent = 'connexion…'; $('statut').style.color = 'var(--gris)'; return; }
+    const st = e.statut || 'en attente';
+    $('statut').textContent = st;
+    $('statut').style.color = st === 'terminé' ? 'var(--ok)' : (st === 'arrêté' || st === 'en pause') ? 'var(--alerte)' : 'var(--or)';
+    $('machine').textContent = 'Suivi depuis ' + (e.machine || "l'autre PC") + (e.debut ? ' · session lancée à ' + e.debut : '');
+    $('faits').textContent = e.spinsFaits ?? 0;
+    $('restants').textContent = e.spinsRestants ?? '?';
+    if (e.pity !== undefined && e.pity !== pityJeu) { pityJeu = e.pity; if (H.length) rendreStats(); }
+    if (e.spinsRestants && +e.spinsRestants > 0 && +e.spinsRestants !== restantsConnus) { restantsConnus = +e.spinsRestants; if (H.length) rendreStats(); }
+    $('vitesse').textContent = e.vitesse ? e.vitesse + ' s' : '–';
+    $('famille').textContent = e.famille ? e.famille + (e.rarete ? ' (' + e.rarete + ')' : '') : '–';
+    $('famille').style.color = coul(e.rarete);
+    $('gardees').textContent = e.gardees && [].concat(e.gardees).length ? 'Familles gardées : ' + [].concat(e.gardees).join(', ') : '';
+    $('statsSession').innerHTML = barres(e.stats || {});
+    $('derniers').innerHTML = [].concat(e.derniers || []).map(d =>
+      `<tr><td>${esc(d.heure)}</td><td style="color:${coul(d.rarete)}">${esc(d.nom)}</td><td style="color:${coul(d.rarete)}">${esc(d.rarete)}</td></tr>`).join('')
+      || '<tr><td colspan="3" class="vide">–</td></tr>';
+    $('maj').textContent = 'Mis à jour à ' + (e.maj || '?');
+    if (e.victoire) {
+      $('victoire').style.display = 'block'; $('victoireTexte').textContent = e.message || '';
+      if (!dejaAlerte) { dejaAlerte = true; alerte(); chargerHistorique(); }
+    } else { $('victoire').style.display = 'none'; dejaAlerte = false; }
+  } catch (err) {
+    $('horsligne').style.display = 'block'; $('statut').textContent = 'hors ligne'; $('statut').style.color = 'var(--alerte)';
+  }
+}
+
+/* ---------- historique ---------- */
+let H = [], filtreRarete = '', limite = 200, dernierNb = -1;
+async function chargerHistorique() {
+  try {
+    const brut = await (await fetch('/historique' + Q, { cache: 'no-store' })).json();
+    if (brut.length === dernierNb) return;
+    dernierNb = brut.length;
+    H = brut.map(([date, heure, session, spin, nom, rar, reste]) => ({ date, heure, session, spin: +spin, nom, rarete: FR[rar] || rar, reste }));
+    rendreHistorique();
+  } catch (e) {}
+}
+function rendreHistorique() {
+  const stats = {}; H.forEach(t => stats[t.rarete] = (stats[t.rarete] || 0) + 1);
+  const sessions = new Map(); H.forEach(t => { if (!sessions.has(t.session)) sessions.set(t.session, []); sessions.get(t.session).push(t); });
+  const belles = H.filter(t => RANG[t.rarete] >= 2).reverse();
+  $('hTotal').textContent = H.length; $('hSessions').textContent = sessions.size; $('hEpiquePlus').textContent = belles.length;
+  $('hStats').innerHTML = barres(stats);
+  $('hBelles').innerHTML = belles.map(t => `<tr><td>${dateFr(t.date)}</td><td>${esc(t.heure)}</td><td style="color:${coul(t.rarete)};font-weight:600">${esc(t.nom)}</td><td style="color:${coul(t.rarete)}">${esc(t.rarete)}</td><td class="num">${t.spin}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="vide">Pas encore d\'épique ou mieux. Courage !</td></tr>';
+  const liste = [...sessions.entries()].reverse();
+  $('hSessionsListe').innerHTML = liste.map(([id, ts]) => {
+    const meilleure = ts.reduce((m, t) => (RANG[t.rarete] > RANG[m.rarete] ? t : m), ts[0]);
+    const fin = ts[ts.length - 1];
+    return `<tr><td>${dateFr(ts[0].date)} ${esc(ts[0].heure)}</td><td class="num">${ts.length}</td><td style="color:${coul(meilleure.rarete)}">${esc(meilleure.nom)} (${esc(meilleure.rarete)})</td><td style="color:${coul(fin.rarete)}">${esc(fin.nom)}</td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="vide">–</td></tr>';
+  const sel = $('filtreSession'), actuel = sel.value;
+  sel.innerHTML = '<option value="">Toutes les sessions</option>' + liste.map(([id, ts]) => `<option value="${esc(id)}">${dateFr(ts[0].date)} ${esc(ts[0].heure)} (${ts.length} spins)</option>`).join('');
+  sel.value = actuel;
+  $('filtresRarete').innerHTML = ['', ...ORDRE].map(r => `<button class="puce${r === filtreRarete ? ' actif' : ''}" data-r="${r}" style="${r ? 'color:' + coul(r) : ''}">${r || 'Toutes'}${r ? ' · ' + (stats[r] || 0) : ''}</button>`).join('');
+  document.querySelectorAll('#filtresRarete .puce').forEach(b => b.onclick = () => { filtreRarete = b.dataset.r; limite = 200; rendreHistorique(); });
+  rendreTable();
+  rendreStats();
+}
+/* ---------- stats ---------- */
+const TAUX = { 'Commune': 79.855, 'Rare': 19.6, 'Épique': 0.35, 'Légendaire': 0.145, 'Mythique': 0.05 };  // % affiches dans le jeu
+const pct = (x, d = 1) => (x).toLocaleString('fr-FR', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %';
+const nb = x => Math.round(x).toLocaleString('fr-FR');
+let restantsConnus = null, pityJeu = null;
+function rendreStats() {
+  const n = H.length;
+  const jourLocal = ms => new Date(ms).toLocaleDateString('sv-SE');  // AAAA-MM-JJ en heure locale
+  const aujourd = jourLocal(Date.now());
+  $('sAujourdhui').textContent = nb(H.filter(t => t.date === aujourd).length);
+  const sec = n * 3.3; $('sTemps').textContent = sec >= 3600 ? (sec / 3600).toFixed(1).replace('.', ',') + ' h' : Math.round(sec / 60) + ' min';
+  const cpt = {}; H.forEach(t => cpt[t.rarete] = (cpt[t.rarete] || 0) + 1);
+  const epPlus = (cpt['Épique'] || 0) + (cpt['Légendaire'] || 0) + (cpt['Mythique'] || 0);
+  const attEp = n * (TAUX['Épique'] + TAUX['Légendaire'] + TAUX['Mythique']) / 100;
+  $('sChance').textContent = n ? `${epPlus} / ${attEp.toFixed(1).replace('.', ',')}` : '–';
+  $('sChance').title = `${epPlus} obtenue(s) pour ${attEp.toFixed(1).replace('.', ',')} attendue(s)`;
+  $('sTaux').innerHTML = ORDRE.map(r => {
+    const obt = cpt[r] || 0, att = n * TAUX[r] / 100;
+    return `<tr><td><span style="color:${coul(r)}">●</span> ${r}</td><td class="num">${nb(obt)}</td><td class="num">${att < 10 ? att.toFixed(1).replace('.', ',') : nb(att)}</td><td class="num">${n ? pct(100 * obt / n, 2) : '–'}</td><td class="num">${pct(TAUX[r], 3)}</td></tr>`;
+  }).join('');
+  // pity : spins depuis la derniere Epique ou mieux (d'apres l'historique)
+  let depuis = 0; for (let i = n - 1; i >= 0 && RANG[H[i].rarete] < 2; i--) depuis++;
+  let serie = 0, record = 0, ecarts = [], dernier = -1;
+  H.forEach((t, i) => { if (RANG[t.rarete] >= 2) { if (dernier >= 0) ecarts.push(i - dernier); dernier = i; serie = 0; } else { serie++; record = Math.max(record, serie); } });
+  const pity = (pityJeu !== null && pityJeu !== undefined) ? +pityJeu : null;
+  $('sPity').textContent = pity !== null ? `${pity} / 400` : '– / 400';
+  $('sPityJauge').style.width = pity !== null ? Math.min(100, pity / 4) + '%' : '0';
+  $('sPityTexte').textContent = (pity !== null ? `Lue dans le jeu : Épique ou mieux garantie dans ${400 - pity} spins au plus.` : 'La pity s\'affiche après quelques spins (lue directement dans le jeu).') +
+    ` Plus longue série sans Épique dans ton historique : ${record}.` + (ecarts.length ? ` Écart moyen entre deux Épiques+ : ${nb(ecarts.reduce((a, b) => a + b, 0) / ecarts.length)} spins.` : '');
+  // probabilites
+  const pLeg = (TAUX['Légendaire'] + TAUX['Mythique']) / 100, pMyt = TAUX['Mythique'] / 100;
+  const pourAvoir = (p, q) => Math.ceil(Math.log(1 - q) / Math.log(1 - p));
+  const R = restantsConnus || (n ? +H[n - 1].reste : 0);
+  const lignes = [
+    ['Spins en moyenne pour une Légendaire ou mieux', nb(1 / pLeg)],
+    ['Spins en moyenne pour une Mythique', nb(1 / pMyt)],
+    ['Spins pour 50 % / 90 % de chances d\'une Légendaire+', `${nb(pourAvoir(pLeg, .5))} / ${nb(pourAvoir(pLeg, .9))}`],
+    ['Spins pour 50 % / 90 % de chances d\'une Mythique', `${nb(pourAvoir(pMyt, .5))} / ${nb(pourAvoir(pMyt, .9))}`],
+  ];
+  if (R) {
+    lignes.push([`Avec tes ${nb(R)} spins restants : chance d'au moins une Légendaire+`, pct(100 * (1 - Math.pow(1 - pLeg, R)))]);
+    lignes.push([`Avec tes ${nb(R)} spins restants : chance d'au moins une Mythique`, pct(100 * (1 - Math.pow(1 - pMyt, R)))]);
+  }
+  $('sProba').innerHTML = lignes.map(([a, b]) => `<tr><td>${a}</td><td class="num" style="font-weight:600">${b}</td></tr>`).join('');
+  // spins par jour
+  const parJour = {}; H.forEach(t => parJour[t.date] = (parJour[t.date] || 0) + 1);
+  const jours = []; for (let k = 13; k >= 0; k--) { const d = jourLocal(Date.now() - k * 864e5); jours.push([d, parJour[d] || 0]); }
+  const max = Math.max(1, ...jours.map(j => j[1]));
+  $('sJours').innerHTML = jours.map(([d, v]) => `<div class="jour" title="${dateFr(d)} : ${v} spin${v > 1 ? 's' : ''}"><span class="v">${v || ''}</span><div class="b" style="height:${v ? Math.max(3, 100 * v / max) : 0}%"></div><span class="d">${d.slice(8)}/${d.slice(5, 7)}</span></div>`).join('');
+  // chaque famille
+  const fam = {}; H.forEach(t => { fam[t.nom] = fam[t.nom] || { n: 0, r: t.rarete }; fam[t.nom].n++; });
+  const maxF = Math.max(1, ...Object.values(fam).map(v => v.n));
+  $('sFamilles').innerHTML = ORDRE.map(r => {
+    const liste = Object.entries(fam).filter(([, v]) => v.r === r).sort((a, b) => b[1].n - a[1].n);
+    if (!liste.length) return '';
+    return `<div class="groupe" style="color:${coul(r)}">${r}</div>` + liste.map(([nom, v]) =>
+      `<div class="barre" title="${esc(nom)} : ${v.n} fois (${pct(100 * v.n / n, 2)} de tes spins)"><span class="nom">${esc(nom)}</span><div class="fond"><div class="plein" style="width:${Math.max(1.5, 100 * v.n / maxF)}%;background:${coul(r)}"></div></div><span class="val">${v.n}</span></div>`).join('');
+  }).join('') || '<span class="vide">Aucun tirage pour l\'instant.</span>';
+}
+function rendreTable() {
+  const s = $('filtreSession').value, q = $('filtreNom').value.trim().toLowerCase();
+  const res = H.filter(t => (!filtreRarete || t.rarete === filtreRarete) && (!s || t.session === s) && (!q || t.nom.toLowerCase().includes(q))).reverse();
+  $('compteFiltre').textContent = res.length + ' tirage' + (res.length > 1 ? 's' : '');
+  $('hTable').innerHTML = res.slice(0, limite).map(t => `<tr><td>${dateFr(t.date)}</td><td>${esc(t.heure)}</td><td style="color:${coul(t.rarete)}">${esc(t.nom)}</td><td style="color:${coul(t.rarete)}">${esc(t.rarete)}</td><td class="num">${t.spin}</td><td class="num">${esc(t.reste)}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="vide">Aucun tirage ne correspond.</td></tr>';
+  $('plus').hidden = res.length <= limite;
+}
+$('filtreSession').onchange = () => { limite = 200; rendreTable(); };
+$('filtreNom').oninput = () => { limite = 200; rendreTable(); };
+$('plus').onclick = () => { limite += 300; rendreTable(); };
+
+majDirect(); chargerHistorique();
+setInterval(majDirect, 2000);
+setInterval(chargerHistorique, 10000);
+</script>
+</body>
+</html>
