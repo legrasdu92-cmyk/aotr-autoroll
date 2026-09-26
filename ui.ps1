@@ -53,7 +53,8 @@ $AdresseSuivi = "http://${IpLocale}:$PortSuivi"
 # ---------- Suivi en ligne (relais Render), sans port entrant : l'envoi ne se fait que quand quelqu'un regarde ----------
 . (Join-Path $Dossier 'relais-envoi.ps1')
 $majCfg = $false
-if (-not $cfg.Contains('RelaisUrl')) { $cfg['RelaisUrl'] = 'https://aotr-suivi.onrender.com'; $majCfg = $true }
+# Desactive par defaut : chacun heberge son propre relais (voir README) et met son adresse dans config.json
+if (-not $cfg.Contains('RelaisUrl')) { $cfg['RelaisUrl'] = ''; $majCfg = $true }
 if (-not ($cfg.Contains('RelaisCode') -and [string]$cfg.RelaisCode -match '^[A-Za-z0-9]{12,40}$')) {
     $cfg['RelaisCode'] = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 16 | ForEach-Object { [char]$_ }); $majCfg = $true
 }

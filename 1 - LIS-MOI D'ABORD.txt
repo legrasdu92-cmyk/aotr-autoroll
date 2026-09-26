@@ -45,8 +45,17 @@ Pendant le roll :
 ---------------------------------------------------------------------
 SUIVRE LE ROLL DEPUIS UN AUTRE APPAREIL (PC principal, téléphone)
 ---------------------------------------------------------------------
+Optionnel. Il faut d'abord héberger ton propre relais (gratuit, ~5 min) :
+  1. Sur render.com : New > Web Service > Public Git Repository >
+     https://github.com/legrasdu92-cmyk/aotr-suivi-relais
+     Build : echo ok     Start : node server.js     Plan : Free
+  2. Ferme l'auto-roll, ouvre config.json (bloc-notes) et mets l'adresse
+     obtenue dans  "RelaisUrl": "https://ton-service.onrender.com"
+  3. Relance l'auto-roll.
+Sans relais, la ligne « Suivi : » donne une page locale (ce PC seulement).
+
 La ligne « Suivi : » de la fenêtre donne TON adresse personnelle
-(https://aotr-suivi.onrender.com/?c=...), bouton « Copier » à côté.
+(https://ton-service.onrender.com/?c=...), bouton « Copier » à côté.
 Ouvre-la n'importe où (PC, téléphone, même en 4G) :
   - onglet « En direct » : statut, spins faits / restants, famille
     actuelle, tirages de la session, derniers spins ;
