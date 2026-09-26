@@ -262,15 +262,16 @@ function Analyser-Bas($lecture) {
 # Fenetre "Are you sure you want to reroll your 'XXX' family?" -> renvoie l'etat et le bouton YES
 function Analyser-Confirmation($lecture) {
     if (-not $lecture -or $lecture.Texte -notmatch '(?i)sure|re-?roll') { return $null }
-    $cibleVue = $null; $oui = $null
+    $cibleVue = $null; $oui = $null; $nomVu = $null
     foreach ($l in $lecture.Lignes) {
         foreach ($m in $l.Mots) {
             $n = Plus-Proche $m.Texte $TousNoms
+            if ($n) { $nomVu = $n }
             if ($n -and (Est-Cible ([pscustomobject]@{ Nom = $n; Rarete = (Rarete-De-Famille $n) }))) { $cibleVue = $n }
             if (-not $oui -and (Plus-Proche $m.Texte @('YES'))) { $oui = $m }
         }
     }
-    [pscustomobject]@{ Texte = $lecture.Texte; CibleEnJeu = $cibleVue; Oui = $oui }
+    [pscustomobject]@{ Texte = $lecture.Texte; CibleEnJeu = $cibleVue; Oui = $oui; NomVu = $nomVu }
 }
 
 # Pity affichee par le jeu (« EPIC+ PITY: 84/400 ») : petite zone lue en agrandi, sinon l'OCR se trompe
@@ -423,11 +424,34 @@ function Fin([string]$msg, [string]$couleur, [switch]$Victoire) {
     if (-not $SansPopup) { [System.Windows.Forms.MessageBox]::Show($msg, 'Auto-roll AOTR') | Out-Null }
     exit
 }
+$script:OuiMemo = $null; $script:DernierOui = $null
 function Gerer-Confirmation($c, $fam) {
     if ($c.CibleEnJeu) { Fin "*** Confirmation demandee pour $($c.CibleEnJeu) : je NE confirme PAS. Arret. ***" 'Green' -Victoire }
-    if (-not $c.Oui) { Fin "Fenetre de confirmation sans bouton YES lisible : arret par securite. [$($c.Texte)]" 'Red' }
+    # Juste apres un clic sur YES, la fenetre est en train de se fermer (bouton survole/anime, souvent illisible) :
+    # on la laisse disparaitre au lieu de recliquer ou de s'arreter
+    if ($script:DernierOui -and $script:DernierOui.ElapsedMilliseconds -lt 1500) { Attendre 200; return }
+    if (-not $c.Oui) {
+        # Fenetre en cours d'apparition ou bouton mal lu : on relit plusieurs fois
+        for ($i = 0; $i -lt 8 -and -not $c.Oui; $i++) {
+            Attendre 250
+            $e = Lire-Etat $script:F $true
+            if (-not $e.Confirm) { return }   # fermee entre-temps
+            $c = $e.Confirm
+            if ($c.CibleEnJeu) { Fin "*** Confirmation demandee pour $($c.CibleEnJeu) : je NE confirme PAS. Arret. ***" 'Green' -Victoire }
+        }
+    }
+    if (-not $c.Oui) {
+        # Toujours illisible : on clique la ou YES a deja ete vu, seulement si le nom de la famille (non gardee) est bien lu
+        $m = $script:OuiMemo
+        if ($m -and $c.NomVu -and $m.W -eq $script:F.W -and $m.H -eq $script:F.H) {
+            Log "   bouton YES illisible : clic a sa position habituelle" 'DarkYellow'
+            $c = [pscustomobject]@{ Oui = [pscustomobject]@{ X = $script:F.X + $m.DX; Y = $script:F.Y + $m.DY } }
+        } else { Fin "Fenetre de confirmation sans bouton YES lisible : arret par securite. [$($c.Texte)]" 'Red' }
+    }
     if ($fam) { Log "   confirmation du reroll de $($fam.Nom) ($($fam.Rarete)) -> YES" 'DarkCyan' }
     Clic-Jeu $c.Oui.X $c.Oui.Y
+    $script:OuiMemo = [pscustomobject]@{ DX = $c.Oui.X - $script:F.X; DY = $c.Oui.Y - $script:F.Y; W = $script:F.W; H = $script:F.H }
+    $script:DernierOui = [Diagnostics.Stopwatch]::StartNew()
 }
 
 # ---------- Mode test : lit l'ecran une fois, ne clique pas ----------
