@@ -21,10 +21,10 @@ try {
     $locale = if (Test-Path $fLocale) { [int]((Get-Content $fLocale -Raw).Trim()) } else { 0 }
     if ($distante -le $locale) { return }
 
-    $liste = [Text.Encoding]::UTF8.GetString((Telecharger 'fichiers.txt')) -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -notmatch '[\\/:]|\.\.' }
+    $liste = [Text.Encoding]::UTF8.GetString((Telecharger 'fichiers.txt')) -split "`r?`n" | ForEach-Object { $_.Trim().TrimStart([char]0xFEFF) } | Where-Object { $_ -and $_ -notmatch '[\\/:]|\.\.' }
     # 1) tout telecharger d'abord (si un fichier echoue, on ne touche a rien)
     $recus = @{}
-    foreach ($nom in $liste) { $recus[$nom] = Telecharger $nom }
+    foreach ($nom in $liste) { try { $recus[$nom] = Telecharger $nom } catch { throw "fichier '$nom' : $($_.Exception.Message)" } }
     # 2) puis remplacer
     foreach ($nom in $liste) { [IO.File]::WriteAllBytes((Join-Path $Dossier $nom), $recus[$nom]) }
     Set-Content $fLocale $distante -Encoding ASCII

@@ -1,4 +1,4 @@
-﻿autoroll.ps1
+autoroll.ps1
 ui.ps1
 familles.psd1
 serveur-suivi.ps1
