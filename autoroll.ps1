@@ -517,6 +517,12 @@ while ($true) { try {
     }
     $script:F = $f
     if (-not $fond -and [W]::GetForegroundWindow() -ne $f.Handle) {
+        # Personne ne se sert du PC depuis 1 min (une fenetre ou notification a pris le premier plan toute seule) :
+        # on remet Roblox devant au lieu de rester en pause indefiniment
+        if ([W]::InactifDepuis() -gt 60000 -and [W]::Activer($f.Handle)) {
+            Log 'Personne n''utilise le PC depuis 1 min : Roblox remis au premier plan.' 'DarkYellow'
+            $e = $null; Attendre 300; continue
+        }
         if (-not $enPause) { Log 'En pause : Roblox n''est pas au premier plan (clique dans le jeu pour reprendre).' 'DarkYellow'; $enPause = $true }
         $e = $null; Attendre 300; continue
     }
