@@ -12,6 +12,21 @@ public static class U {
 }
 "@
 
+# Une seule fenetre a la fois : deux fenetres enverraient deux etats differents au site de suivi
+# (et deux lancements cliqueraient en meme temps dans Roblox). Deja ouverte -> on la remet devant.
+$script:UneSeule = New-Object Threading.Mutex($false, 'Local\AOTR-AutoRoll-Fenetre')
+$libre = try { $script:UneSeule.WaitOne(0) } catch [Threading.AbandonedMutexException] { $true }
+if (-not $libre) {
+    $autre = Get-Process powershell, pwsh -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $PID -and $_.MainWindowTitle -like 'Auto-roll familles AOTR*' } | Select-Object -First 1
+    if ($autre) {
+        if ([U]::IsIconic($autre.MainWindowHandle)) { [void][U]::ShowWindow($autre.MainWindowHandle, 9) }
+        [void][U]::SetForegroundWindow($autre.MainWindowHandle)
+    } else {
+        [void][System.Windows.Forms.MessageBox]::Show("L'auto-roll est deja ouvert (regarde dans la barre des taches).", 'Auto-roll AOTR')
+    }
+    exit
+}
+
 $Dossier    = $PSScriptRoot
 $Moteur     = Join-Path $Dossier 'autoroll.ps1'
 $ConfigPath = Join-Path $Dossier 'config.json'
