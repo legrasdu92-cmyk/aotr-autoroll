@@ -77,6 +77,9 @@
   <div class="carte" id="horsligne">L'autre PC ne répond plus (fenêtre de l'auto-roll fermée, PC en veille ou réseau coupé). Nouvel essai automatique…</div>
   <div class="carte" id="attente" style="display:none;color:var(--gris)">Connexion à l'autre PC… Il commence à envoyer ses données dès que cette page est ouverte (en général moins de 15 s). La fenêtre de l'auto-roll doit être ouverte sur l'autre PC.</div>
   <div class="carte" id="victoire"><b>Famille obtenue !</b><span id="victoireTexte"></span></div>
+  <div class="carte" id="arret" style="display:none">
+    <b>Arrêt :</b> <span id="arretTexte" style="overflow-wrap:anywhere"></span>
+  </div>
 
   <div class="onglets">
     <button class="actif" data-onglet="direct">En direct</button>
@@ -175,10 +178,22 @@ const $ = id => document.getElementById(id);
 /* En ligne (relais Render) : code secret dans l'adresse (?c=...). En local (reseau de la maison) : pas de code. */
 const CODE = new URLSearchParams(location.search).get('c');
 const Q = CODE ? '?c=' + encodeURIComponent(CODE) : '';
+/* Reveil de l'auto-roll : il n'envoie ses donnees que quand quelqu'un regarde (economise les heures Render).
+   Un message ntfy le reveille ; ensuite le relais lui dit lui-meme que la page est ouverte.
+   ntfy limite chaque connexion a ~250 messages par jour : on ne reveille que si les donnees ne bougent plus. */
+let dernierReveil = 0, ageDonnees = 0, reveilRefuse = false, ecartReveil = 120000;
+function reveiller() {
+  dernierReveil = Date.now();
+  fetch('https://ntfy.sh/aotr-' + CODE, { method: 'POST', body: 'vu' })
+    .then(r => { reveilRefuse = r.status === 429; }).catch(() => {});
+}
 if (CODE) {
-  // Signal « quelqu'un regarde » : l'auto-roll n'envoie ses donnees que pendant ce temps (economise les heures Render)
-  const signal = () => fetch('https://ntfy.sh/aotr-' + CODE, { method: 'POST', body: 'vu' }).catch(() => {});
-  signal(); setInterval(signal, 60000);
+  reveiller();
+  // PC eteint ou programme ferme : les reveils s'espacent (2, 4, 8… jusqu'a 30 min) pour ne pas epuiser ntfy
+  setInterval(() => {
+    if (ageDonnees <= 45000) { ecartReveil = 120000; return; }
+    if (Date.now() - dernierReveil > ecartReveil) { ecartReveil = Math.min(ecartReveil * 2, 1800000); reveiller(); }
+  }, 15000);
 }
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const dateFr = d => d ? d.split('-').reverse().join('/') : '';
@@ -220,6 +235,7 @@ async function majDirect() {
     const e = await (await fetch('/etat' + Q, { cache: 'no-store' })).json();
     $('horsligne').style.display = 'none';
     $('attente').style.display = e._vide ? 'block' : 'none';
+    ageDonnees = e._vide ? Infinity : (e._relaisAge ?? 0);
     if (e._vide) { $('statut').textContent = 'connexion…'; $('statut').style.color = 'var(--gris)'; return; }
     const st = e.statut || 'en attente';
     $('statut').textContent = st;
@@ -237,7 +253,11 @@ async function majDirect() {
     $('derniers').innerHTML = [].concat(e.derniers || []).map(d =>
       `<tr><td>${esc(d.heure)}</td><td style="color:${coul(d.rarete)}">${esc(d.nom)}</td><td style="color:${coul(d.rarete)}">${esc(d.rarete)}</td></tr>`).join('')
       || '<tr><td colspan="3" class="vide">–</td></tr>';
-    $('maj').textContent = 'Mis à jour à ' + (e.maj || '?');
+    $('maj').textContent = 'Mis à jour à ' + (e.maj || '?') + (ageDonnees > 45000
+      ? (reveilRefuse ? ' · réveil du PC refusé par ntfy (trop de messages aujourd\'hui), nouvel essai plus tard…' : ' · le PC n\'envoie plus, réveil en cours…') : '');
+    const arret = !e.victoire && e.message && (st === 'arrêté' || st === 'en pause');
+    $('arret').style.display = arret ? 'block' : 'none';
+    if (arret) $('arretTexte').textContent = e.message;
     if (e.victoire) {
       $('victoire').style.display = 'block'; $('victoireTexte').textContent = e.message || '';
       if (!dejaAlerte) { dejaAlerte = true; alerte(); chargerHistorique(); }

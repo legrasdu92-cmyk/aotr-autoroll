@@ -1,7 +1,8 @@
 # Envoi vers le relais en ligne (Render), lance par ui.ps1.
 # Pour economiser les heures Render, on n'envoie RIEN tant que personne ne regarde la page :
-# la page publie un signal "vu" sur ntfy.sh (gratuit, sans compte) toutes les minutes,
-# on l'ecoute ici (connexion sortante uniquement) et on n'envoie que pendant ~2,5 min apres le dernier signal.
+# a son ouverture, la page publie un signal "vu" sur ntfy.sh (gratuit, sans compte), qu'on ecoute ici
+# (connexion sortante uniquement). Ensuite chaque reponse du relais dit si la page est encore ouverte ;
+# on s'arrete ~2,5 min apres qu'elle a ete fermee.
 
 function Demarrer-EnvoiRelais([string]$Url, [string]$Code, $Etat, [string]$FichierTirages, $Signal) {
     $Signal['vu'] = [long]0
@@ -66,6 +67,8 @@ function Demarrer-EnvoiRelais([string]$Url, [string]$Code, $Etat, [string]$Fichi
                     $json = '{"etat":' + ($copie | ConvertTo-Json -Depth 5 -Compress) + ',"depuis":' + $envoye + ',"tirages":[' + $sb.ToString() + ']}'
                     $rep = Invoke-RestMethod -Method Post -Uri "$Url/api/envoi?c=$Code" -Body ([Text.Encoding]::UTF8.GetBytes($json)) -ContentType 'application/json; charset=utf-8' -TimeoutSec 90
                     $envoye = [int]$rep.nb
+                    # le relais indique si la page est encore ouverte : on continue sans attendre de nouveau signal ntfy
+                    if ($rep.spectateur -eq $true) { $Signal['vu'] = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() }
                     if ($envoye -lt $lignes.Count) { $pause = 0 }   # reste de l'historique a envoyer : on enchaine
                     $Signal['relais'] = "envoi en cours ($(Get-Date -Format 'HH:mm:ss'))"
                 } elseif ($actif) {

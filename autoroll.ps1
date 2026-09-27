@@ -168,11 +168,11 @@ function Lire-Zone($f, $zone, $echelle = 1) {
     if ($script:ImageSource) {
         $g.InterpolationMode = 'HighQualityBicubic'
         $g.DrawImage($script:ImageSource, $dest, $x1, $y1, $w, $h, [System.Drawing.GraphicsUnit]::Pixel)
-    } elseif ([W]::GetForegroundWindow() -eq $f.Handle -and $echelle -eq 1) {
+    } elseif ([W]::GetForegroundWindow() -eq $f.Handle -and $echelle -eq 1 -and -not $script:CaptureFenetre) {
         $g.CopyFromScreen($f.X + $x1, $f.Y + $y1, 0, 0, $bmp.Size)       # rapide : copie directe de l'ecran
     } else {
         if (-not $script:Plein) {
-            $script:Plein = if ([W]::GetForegroundWindow() -eq $f.Handle) {
+            $script:Plein = if ([W]::GetForegroundWindow() -eq $f.Handle -and -not $script:CaptureFenetre) {
                 $b = New-Object System.Drawing.Bitmap $f.W, $f.H; $gg = [System.Drawing.Graphics]::FromImage($b)
                 $gg.CopyFromScreen($f.X, $f.Y, 0, 0, $b.Size); $gg.Dispose(); $b
             } else { Capture-Fenetre-Complete $f }
@@ -425,6 +425,14 @@ function Fin([string]$msg, [string]$couleur, [switch]$Victoire) {
     exit
 }
 $script:OuiMemo = $null; $script:DernierOui = $null
+# Tout le texte visible (a l'ecran, ou dans l'image de la fenetre Roblox) : pour comprendre un arret
+function Texte-Complet($f, [bool]$fenetre) {
+    $avant = $script:CaptureFenetre; $script:CaptureFenetre = $fenetre; $script:Plein = $null
+    try { ((Lire-Zone $f @(0, 0, 1, 1) 1).Texte -replace '\s+', ' ').Trim() } catch { '' }
+    finally { $script:CaptureFenetre = $avant; if ($script:Plein) { $script:Plein.Dispose(); $script:Plein = $null } }
+}
+function Couper([string]$s, [int]$n) { if (-not $s) { 'rien' } elseif ($s.Length -gt $n) { $s.Substring(0, $n) + '...' } else { $s } }
+
 function Gerer-Confirmation($c, $fam) {
     if ($c.CibleEnJeu) { Fin "*** Confirmation demandee pour $($c.CibleEnJeu) : je NE confirme PAS. Arret. ***" 'Green' -Victoire }
     # Juste apres un clic sur YES, la fenetre est en train de se fermer (bouton survole/anime, souvent illisible) :
@@ -523,7 +531,18 @@ while ($true) { try {
 
     if (-not $fam -or -not $e.Bas.Roll) {
         $echecs++
-        if ($echecs -ge 60) { Fin 'Impossible de lire la famille ou le bouton ROLL depuis ~15 s. Es-tu bien sur l''ecran des familles ? Arret.' 'Red' }
+        # Rien de lisible : une fenetre (notification Windows...) recouvre peut-etre Roblox -> on change de methode de capture
+        if ($echecs -in 8, 25, 42) {
+            $script:CaptureFenetre = -not $script:CaptureFenetre
+            Log ("   lecture impossible, essai en capturant " + $(if ($script:CaptureFenetre) { 'la fenetre Roblox directement' } else { "l'ecran" })) 'DarkYellow'
+            # la capture d'ecran ne voit Roblox que s'il est devant : on le remet au premier plan une fois
+            if ($echecs -eq 25 -and [W]::GetForegroundWindow() -ne $f.Handle) { [W]::Activer($f.Handle) | Out-Null; Log '   Roblox remis au premier plan' 'DarkYellow' }
+        }
+        if ($echecs -ge 60) {
+            $lu = if ($e -and $e.LuBas) { ($e.LuBas.Texte -replace '\s+', ' ').Trim() } else { '' }
+            $ecr = Texte-Complet $f $false; $fen = Texte-Complet $f $true
+            Fin "Impossible de lire la famille ou le bouton ROLL depuis ~15 s. Es-tu bien sur l'ecran des familles ? Arret. [en bas : $(Couper $lu 100)] [ecran : $(Couper $ecr 220)] [fenetre Roblox : $(Couper $fen 220)]" 'Red'
+        }
         $e = $null; Attendre 150; continue
     }
     # Nom non reconnu (lecture ratee ?) : on relit avant de decider quoi que ce soit
